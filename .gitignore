@@ -26,6 +26,8 @@ wheels/
 # X-Ray specific
 xray.db
 *.db
+test_xray.db
+test_independence.py
 
 # IDE
 .vscode/

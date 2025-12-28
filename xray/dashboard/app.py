@@ -8,10 +8,10 @@ import sys
 
 # Add parent directory to path to import xray
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
-from xray.storage import Storage
+from xray.storage_sqlite import SQLiteStorage
 
 app = Flask(__name__)
-storage = Storage()
+storage = SQLiteStorage()  # Dashboard requires persistent storage
 
 
 @app.route('/')

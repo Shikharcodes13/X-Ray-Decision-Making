@@ -24,16 +24,20 @@ class XRay:
             )
     """
     
-    def __init__(self, execution_id: Optional[str] = None, storage: Optional[Any] = None):
+    def __init__(self, execution_id: Optional[str] = None, storage: Optional[Any] = None, auto_save: bool = True):
         """
         Initialize X-Ray context.
         
         Args:
             execution_id: Optional execution ID. If None, generates a new UUID.
-            storage: Storage instance. If None, creates a default in-memory storage.
+            storage: Storage instance implementing StorageBackend interface.
+                    If None, no persistence (data only available during execution).
+            auto_save: If True, automatically save to storage on context exit.
+                      If False, you must manually call get_execution() to access data.
         """
         self.execution_id = execution_id or str(uuid.uuid4())
         self.storage = storage
+        self.auto_save = auto_save
         self.steps: list = []
         self.metadata: Dict[str, Any] = {
             "started_at": datetime.utcnow().isoformat(),
@@ -47,12 +51,12 @@ class XRay:
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """Exit context manager and save execution."""
+        """Exit context manager and optionally save execution."""
         self._active = False
         self.metadata["completed_at"] = datetime.utcnow().isoformat()
         self.metadata["total_steps"] = len(self.steps)
         
-        if self.storage:
+        if self.storage and self.auto_save:
             self.storage.save_execution(
                 execution_id=self.execution_id,
                 metadata=self.metadata,
@@ -60,6 +64,34 @@ class XRay:
             )
         
         return False
+    
+    def get_execution(self) -> Dict[str, Any]:
+        """
+        Get the current execution data.
+        
+        Returns:
+            Dictionary containing execution_id, metadata, and steps
+        """
+        return {
+            "execution_id": self.execution_id,
+            "metadata": self.metadata,
+            "steps": self.steps
+        }
+    
+    def save(self):
+        """
+        Manually save execution to storage.
+        
+        Useful when auto_save=False or when you want to save before context exit.
+        """
+        if not self.storage:
+            raise RuntimeError("No storage backend configured. Provide a storage instance when creating XRay.")
+        
+        self.storage.save_execution(
+            execution_id=self.execution_id,
+            metadata=self.metadata,
+            steps=self.steps
+        )
     
     def record_step(
         self,

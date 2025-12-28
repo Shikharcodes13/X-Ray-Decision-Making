@@ -11,7 +11,7 @@ from pathlib import Path
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from xray import XRay, Storage
+from xray import XRay, SQLiteStorage
 import random
 import time
 
@@ -211,7 +211,8 @@ def run_competitor_selection(reference_product: dict):
     Args:
         reference_product: Dictionary with product details (title, category, price, etc.)
     """
-    storage = Storage()
+    # Use SQLite storage for persistence (optional - can use InMemoryStorage or None)
+    storage = SQLiteStorage()
     
     with XRay(storage=storage) as xray:
         xray.add_metadata("workflow", "competitor_selection")
@@ -315,17 +316,17 @@ if __name__ == "__main__":
         "reviews": 1247
     }
     
-    print("🔍 Running Competitor Selection Workflow...")
+    print("Running Competitor Selection Workflow...")
     print(f"Reference Product: {reference_product['title']}")
     print()
     
     result = run_competitor_selection(reference_product)
     
-    print(f"✅ Execution ID: {result['execution_id']}")
-    print(f"✅ Selected Competitor: {result['selected_competitor']['title']}")
+    print(f"[SUCCESS] Execution ID: {result['execution_id']}")
+    print(f"[SUCCESS] Selected Competitor: {result['selected_competitor']['title']}")
     print(f"   Price: ${result['selected_competitor']['price']}")
-    print(f"   Rating: {result['selected_competitor']['rating']}★")
+    print(f"   Rating: {result['selected_competitor']['rating']} stars")
     print(f"   Reviews: {result['selected_competitor']['reviews']}")
     print()
-    print(f"📊 View in dashboard: http://localhost:5000/execution/{result['execution_id']}")
+    print(f"[INFO] View in dashboard: http://localhost:5000/execution/{result['execution_id']}")
 
