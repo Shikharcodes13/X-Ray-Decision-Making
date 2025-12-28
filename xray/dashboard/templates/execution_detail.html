@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Execution Detail - X-Ray Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: #f5f5f5;
+            color: #333;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .back-link {
+            color: #2563eb;
+            text-decoration: none;
+            margin-bottom: 10px;
+            display: inline-block;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+        
+        h1 {
+            color: #2563eb;
+            margin-bottom: 10px;
+        }
+        
+        .execution-id {
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            color: #666;
+            background: #f3f4f6;
+            padding: 4px 8px;
+            border-radius: 4px;
+            display: inline-block;
+        }
+        
+        .steps-container {
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+        }
+        
+        .step-card {
+            background: white;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            overflow: hidden;
+        }
+        
+        .step-header {
+            background: #2563eb;
+            color: white;
+            padding: 15px 20px;
+            font-weight: 600;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .step-number {
+            background: rgba(255,255,255,0.2);
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+        }
+        
+        .step-content {
+            padding: 20px;
+        }
+        
+        .section {
+            margin-bottom: 20px;
+        }
+        
+        .section:last-child {
+            margin-bottom: 0;
+        }
+        
+        .section-title {
+            font-weight: 600;
+            color: #2563eb;
+            margin-bottom: 10px;
+            font-size: 14px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .reasoning {
+            background: #f0f9ff;
+            border-left: 3px solid #2563eb;
+            padding: 12px;
+            border-radius: 4px;
+            font-size: 14px;
+            color: #1e40af;
+        }
+        
+        .data-view {
+            background: #f9fafb;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 12px;
+            font-family: 'Monaco', 'Courier New', monospace;
+            font-size: 12px;
+            overflow-x: auto;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .json-key {
+            color: #059669;
+        }
+        
+        .json-string {
+            color: #dc2626;
+        }
+        
+        .json-number {
+            color: #2563eb;
+        }
+        
+        .json-boolean {
+            color: #7c3aed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #999;
+        }
+        
+        .evaluation-item {
+            background: white;
+            border: 1px solid #e5e7eb;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 8px;
+        }
+        
+        .evaluation-item.qualified {
+            border-left: 4px solid #10b981;
+        }
+        
+        .evaluation-item.disqualified {
+            border-left: 4px solid #ef4444;
+        }
+        
+        .filter-result {
+            display: inline-block;
+            padding: 2px 6px;
+            border-radius: 3px;
+            font-size: 11px;
+            margin-left: 8px;
+        }
+        
+        .filter-result.passed {
+            background: #d1fae5;
+            color: #065f46;
+        }
+        
+        .filter-result.failed {
+            background: #fee2e2;
+            color: #991b1b;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Back to executions</a>
+            <h1>Execution Detail</h1>
+            <div class="execution-id" id="executionId">Loading...</div>
+        </header>
+        
+        <div class="steps-container" id="stepsContainer">
+            <div class="loading">Loading execution data...</div>
+        </div>
+    </div>
+    
+    <script>
+        const executionId = '{{ execution_id }}';
+        
+        function formatJSON(obj, indent = 0) {
+            if (obj === null) return '<span class="json-boolean">null</span>';
+            if (typeof obj === 'string') return `<span class="json-string">"${obj}"</span>`;
+            if (typeof obj === 'number') return `<span class="json-number">${obj}</span>`;
+            if (typeof obj === 'boolean') return `<span class="json-boolean">${obj}</span>`;
+            if (Array.isArray(obj)) {
+                if (obj.length === 0) return '[]';
+                const items = obj.map(item => 
+                    '  '.repeat(indent + 1) + formatJSON(item, indent + 1)
+                ).join(',\n');
+                return `[\n${items}\n${'  '.repeat(indent)}]`;
+            }
+            if (typeof obj === 'object') {
+                const keys = Object.keys(obj);
+                if (keys.length === 0) return '{}';
+                const items = keys.map(key => {
+                    const value = formatJSON(obj[key], indent + 1);
+                    return '  '.repeat(indent + 1) + `<span class="json-key">"${key}"</span>: ${value}`;
+                }).join(',\n');
+                return `{\n${items}\n${'  '.repeat(indent)}}`;
+            }
+            return String(obj);
+        }
+        
+        function renderStep(step, index) {
+            const stepName = step.step || 'unknown';
+            const timestamp = step.timestamp ? new Date(step.timestamp).toLocaleString() : '';
+            
+            let contentHTML = '';
+            
+            // Reasoning
+            if (step.reasoning) {
+                contentHTML += `
+                    <div class="section">
+                        <div class="section-title">Reasoning</div>
+                        <div class="reasoning">${step.reasoning}</div>
+                    </div>
+                `;
+            }
+            
+            // Input
+            if (step.input && Object.keys(step.input).length > 0) {
+                contentHTML += `
+                    <div class="section">
+                        <div class="section-title">Input</div>
+                        <div class="data-view">${formatJSON(step.input)}</div>
+                    </div>
+                `;
+            }
+            
+            // Special handling for filter evaluations
+            if (step.evaluations && Array.isArray(step.evaluations)) {
+                contentHTML += `
+                    <div class="section">
+                        <div class="section-title">Evaluations</div>
+                        ${step.evaluations.map(eval => {
+                            const qualified = eval.qualified !== false;
+                            const className = qualified ? 'qualified' : 'disqualified';
+                            let filterResultsHTML = '';
+                            
+                            if (eval.filter_results) {
+                                filterResultsHTML = Object.entries(eval.filter_results).map(([filterName, result]) => {
+                                    const passed = result.passed !== false;
+                                    const className = passed ? 'passed' : 'failed';
+                                    return `<span class="filter-result ${className}">${filterName}: ${passed ? '✓' : '✗'}</span>`;
+                                }).join('');
+                            }
+                            
+                            return `
+                                <div class="evaluation-item ${className}">
+                                    <strong>${eval.title || eval.asin || 'Item'}</strong>
+                                    ${filterResultsHTML}
+                                    ${eval.metrics ? `<div style="margin-top: 4px; font-size: 11px; color: #666;">${JSON.stringify(eval.metrics)}</div>` : ''}
+                                </div>
+                            `;
+                        }).join('')}
+                    </div>
+                `;
+            }
+            
+            // Output
+            if (step.output && Object.keys(step.output).length > 0) {
+                contentHTML += `
+                    <div class="section">
+                        <div class="section-title">Output</div>
+                        <div class="data-view">${formatJSON(step.output)}</div>
+                    </div>
+                `;
+            }
+            
+            // Filters applied
+            if (step.filters_applied) {
+                contentHTML += `
+                    <div class="section">
+                        <div class="section-title">Filters Applied</div>
+                        <div class="data-view">${formatJSON(step.filters_applied)}</div>
+                    </div>
+                `;
+            }
+            
+            // Ranking
+            if (step.ranked_candidates) {
+                contentHTML += `
+                    <div class="section">
+                        <div class="section-title">Ranked Candidates</div>
+                        ${step.ranked_candidates.map(candidate => `
+                            <div class="evaluation-item qualified">
+                                <strong>Rank ${candidate.rank}: ${candidate.title || candidate.asin}</strong>
+                                ${candidate.total_score ? `<div style="margin-top: 4px; font-size: 11px; color: #666;">Score: ${candidate.total_score}</div>` : ''}
+                            </div>
+                        `).join('')}
+                    </div>
+                `;
+            }
+            
+            return `
+                <div class="step-card">
+                    <div class="step-header">
+                        <span>${stepName}</span>
+                        <span class="step-number">Step ${index + 1}</span>
+                    </div>
+                    <div class="step-content">
+                        ${contentHTML || '<div style="color: #999;">No additional data</div>'}
+                    </div>
+                </div>
+            `;
+        }
+        
+        async function loadExecution() {
+            try {
+                const response = await fetch(`/api/executions/${executionId}`);
+                const execution = await response.json();
+                
+                document.getElementById('executionId').textContent = execution.execution_id;
+                
+                const container = document.getElementById('stepsContainer');
+                
+                if (!execution.steps || execution.steps.length === 0) {
+                    container.innerHTML = '<div class="loading">No steps found in this execution</div>';
+                    return;
+                }
+                
+                container.innerHTML = execution.steps.map((step, index) => 
+                    renderStep(step, index)
+                ).join('');
+            } catch (error) {
+                document.getElementById('stepsContainer').innerHTML = 
+                    `<div class="loading">Error loading execution: ${error.message}</div>`;
+            }
+        }
+        
+        loadExecution();
+    </script>
+</body>
+</html>
+
