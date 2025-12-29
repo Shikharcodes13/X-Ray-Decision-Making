@@ -1,0 +1,20 @@
+# Core X-Ray library has zero dependencies
+# It works standalone with in-memory storage
+
+# Optional: SQLite storage (SQLite is built into Python, no install needed)
+# But if you want to use SQLiteStorage, it's already available
+
+# Optional: Dashboard dependencies (only needed for web UI)
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+python-multipart==0.0.6
+
+# File processing for data upload
+pandas==2.1.3
+openpyxl==3.1.2
+
+# Optional: Google Sheets support (only needed if using Google Sheets as rules source)
+# gspread==5.12.0
+# google-auth==2.23.4
+# google-auth-oauthlib==1.1.0
+# google-auth-httplib2==0.1.1

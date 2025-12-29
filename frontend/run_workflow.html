@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Run Workflow - X-Ray Dashboard</title>
+    <link rel="stylesheet" href="styles/main.css">
+    <style>
+        .workflow-form {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        .form-section {
+            background: white;
+            border-radius: 8px;
+            padding: 20px;
+            margin-bottom: 20px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        
+        .form-section h2 {
+            margin-top: 0;
+            color: #333;
+            border-bottom: 2px solid #007bff;
+            padding-bottom: 10px;
+        }
+        
+        .form-group {
+            margin-bottom: 15px;
+        }
+        
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: #555;
+        }
+        
+        .form-group input,
+        .form-group select,
+        .form-group textarea {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            font-family: 'Courier New', monospace;
+        }
+        
+        .form-group textarea {
+            min-height: 200px;
+            resize: vertical;
+        }
+        
+        .format-toggle {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+        }
+        
+        .format-toggle button {
+            padding: 8px 16px;
+            border: 2px solid #007bff;
+            background: white;
+            color: #007bff;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+        }
+        
+        .format-toggle button.active {
+            background: #007bff;
+            color: white;
+        }
+        
+        .format-toggle button:hover {
+            background: #0056b3;
+            color: white;
+        }
+        
+        .btn-primary {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+            margin-right: 10px;
+        }
+        
+        .btn-primary:hover {
+            background: #0056b3;
+        }
+        
+        .btn-primary:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        
+        .btn-secondary {
+            background: #6c757d;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 4px;
+            font-size: 16px;
+            cursor: pointer;
+        }
+        
+        .btn-secondary:hover {
+            background: #5a6268;
+        }
+        
+        .example-link {
+            color: #007bff;
+            text-decoration: none;
+            font-size: 14px;
+            margin-left: 10px;
+        }
+        
+        .example-link:hover {
+            text-decoration: underline;
+        }
+        
+        .status-message {
+            padding: 15px;
+            border-radius: 4px;
+            margin: 20px 0;
+        }
+        
+        .status-message.success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .status-message.error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .status-message.info {
+            background: #d1ecf1;
+            color: #0c5460;
+            border: 1px solid #bee5eb;
+        }
+        
+        .input-preview {
+            background: #f8f9fa;
+            padding: 10px;
+            border-radius: 4px;
+            margin-top: 10px;
+            font-size: 12px;
+            color: #666;
+        }
+        
+        .back-link {
+            display: inline-block;
+            margin-bottom: 20px;
+            color: #007bff;
+            text-decoration: none;
+        }
+        
+        .back-link:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <a href="/" class="back-link">← Back to Dashboard</a>
+            <h1>🚀 Run Workflow</h1>
+            <p class="subtitle">Input rules and run a workflow execution</p>
+        </header>
+        
+        <div class="workflow-form">
+            <div id="statusMessage"></div>
+            
+            <div class="form-section">
+                <h2>Rules Configuration</h2>
+                <div class="format-toggle">
+                    <button id="formatJson" class="active">JSON Format</button>
+                    <button id="formatCsv">CSV Format</button>
+                </div>
+                
+                <div class="form-group">
+                    <label for="rulesInput">
+                        Rules 
+                        <a href="#" id="loadExample" class="example-link">Load Example</a>
+                    </label>
+                    <textarea id="rulesInput" placeholder='Enter rules in JSON or CSV format...'></textarea>
+                    <div class="input-preview" id="rulesPreview"></div>
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <h2>Input Data</h2>
+                <div class="form-group">
+                    <label for="numCandidates">Number of Candidates</label>
+                    <input type="number" id="numCandidates" value="15" min="1" max="100">
+                </div>
+                <div class="form-group">
+                    <label for="referenceValue">Reference Value (optional)</label>
+                    <input type="number" id="referenceValue" value="50.0" step="0.1">
+                </div>
+            </div>
+            
+            <div class="form-section">
+                <button id="runWorkflow" class="btn-primary">Run Workflow</button>
+                <button id="validateRules" class="btn-secondary">Validate Rules</button>
+            </div>
+        </div>
+    </div>
+    
+    <script type="module" src="dist/run_workflow.js"></script>
+</body>
+</html>
+

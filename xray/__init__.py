@@ -1,22 +1,14 @@
 """
-X-Ray Library - A debugging tool for multi-step algorithmic systems.
-
-Provides transparency into decision-making processes by capturing
-inputs, outputs, reasoning, and intermediate states at each step.
-
-The library is designed to be plug-and-play with zero dependencies.
-Use it standalone or with optional storage backends.
+X-Ray Library - General-purpose debugging system for multi-step algorithmic workflows.
 """
 
-from .core import XRay, xray_step
-from .storage import Storage, StorageBackend, InMemoryStorage
+from .core import XRay
+from .storage import InMemoryStorage, StorageBackend
+from .storage_sqlite import SQLiteStorage
 
-# Optional SQLite storage (no extra dependencies, SQLite is built into Python)
-try:
-    from .storage_sqlite import SQLiteStorage
-    __all__ = ["XRay", "xray_step", "Storage", "StorageBackend", "InMemoryStorage", "SQLiteStorage"]
-except ImportError:
-    __all__ = ["XRay", "xray_step", "Storage", "StorageBackend", "InMemoryStorage"]
-
-__version__ = "0.1.0"
-
+__all__ = [
+    'XRay',
+    'InMemoryStorage',
+    'StorageBackend',
+    'SQLiteStorage',
+]

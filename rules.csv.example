@@ -1,0 +1,6 @@
+step,type,name,field,rule_type,value,min,max,primary,secondary,tertiary,description
+apply_filters,filter,price_range,price,range,,14.99,59.98,,,,"Price must be between 0.5x and 2x of reference price"
+apply_filters,filter,min_rating,rating,min,3.8,,,,,"Minimum rating of 3.8 stars"
+apply_filters,filter,min_reviews,reviews,min,100,,,,,"Minimum of 100 reviews"
+rank_and_select,ranking,,,,,,,,review_count,rating,price_proximity,"Rank by review count (primary), rating (secondary), price proximity (tertiary)"
+

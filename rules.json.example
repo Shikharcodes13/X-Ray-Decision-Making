@@ -1,0 +1,41 @@
+{
+  "rules": [
+    {
+      "step": "apply_filters",
+      "type": "filter",
+      "name": "price_range",
+      "field": "price",
+      "rule_type": "range",
+      "min": 14.99,
+      "max": 59.98,
+      "description": "Price must be between 0.5x and 2x of reference price"
+    },
+    {
+      "step": "apply_filters",
+      "type": "filter",
+      "name": "min_rating",
+      "field": "rating",
+      "rule_type": "min",
+      "value": 3.8,
+      "description": "Minimum rating of 3.8 stars"
+    },
+    {
+      "step": "apply_filters",
+      "type": "filter",
+      "name": "min_reviews",
+      "field": "reviews",
+      "rule_type": "min",
+      "value": 100,
+      "description": "Minimum of 100 reviews"
+    },
+    {
+      "step": "rank_and_select",
+      "type": "ranking",
+      "primary": "review_count",
+      "secondary": "rating",
+      "tertiary": "price_proximity",
+      "description": "Rank by review count (primary), rating (secondary), price proximity (tertiary)"
+    }
+  ]
+}
+

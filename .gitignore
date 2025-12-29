@@ -28,6 +28,13 @@ xray.db
 *.db
 test_xray.db
 test_independence.py
+check_status.py
+start_dashboard.py
+
+# Frontend
+frontend/node_modules/
+frontend/dist/
+frontend/.DS_Store
 
 # IDE
 .vscode/
@@ -39,4 +46,3 @@ test_independence.py
 # OS
 .DS_Store
 Thumbs.db
-

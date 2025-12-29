@@ -1,0 +1,6 @@
+step,type,name,field,rule_type,value,min,max,primary,secondary,tertiary,description
+apply_filters,filter,value_range,value,range,,25.0,100.0,,,,"Value must be between 25.0 and 100.0"
+apply_filters,filter,min_score,score,min,2.0,,,,,"Minimum score of 2.0"
+apply_filters,filter,min_count,count,min,100,,,,,"Minimum count of 100"
+rank_and_select,ranking,,,,,,,,count,score,value,"Rank by count (primary), score (secondary), value (tertiary)"
+
