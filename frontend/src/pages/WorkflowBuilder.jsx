@@ -388,20 +388,25 @@ function StepEditor({ step, index, dataset, onUpdate, onDelete }) {
                   <label>
                     <strong>Operator</strong>
                     <select
-                      value={step.rule?.operator || '>='}
+                      value={step.rule?.operator || '=='}
                       onChange={(e) =>
                         onUpdate({
                           rule: { ...step.rule, operator: e.target.value }
                         })
                       }
                     >
-                      <option value=">=">Greater than or equal (≥)</option>
-                      <option value="<=">Less than or equal (≤)</option>
-                      <option value=">">Greater than (&gt;)</option>
-                      <option value="<">Less than (&lt;)</option>
-                      <option value="==">Equals (==)</option>
+                      <option value="==">Equals (==) - Exact match</option>
                       <option value="!=">Not equals (!=)</option>
-                      <option value="contains">Contains</option>
+                      <option value="contains">Contains - Substring match</option>
+                      <option value="not_contains">Not Contains</option>
+                      <option value="starts_with">Starts With</option>
+                      <option value="ends_with">Ends With</option>
+                      <option value="in">In List</option>
+                      <option value="not_in">Not In List</option>
+                      <option value=">=">Greater than or equal (≥) - Numbers only</option>
+                      <option value="<=">Less than or equal (≤) - Numbers only</option>
+                      <option value=">">Greater than (&gt;) - Numbers only</option>
+                      <option value="<">Less than (&lt;) - Numbers only</option>
                     </select>
                   </label>
                 </div>

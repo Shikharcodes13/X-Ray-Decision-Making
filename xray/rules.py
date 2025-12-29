@@ -260,13 +260,28 @@ class RuleConfig:
         min_val = filter_rule.get('min')
         max_val = filter_rule.get('max')
         
-        if not field or field not in item:
+        # Case-insensitive field matching
+        if not field:
             return {
                 'passed': False,
                 'detail': f'Field "{field}" not found in item'
             }
         
-        item_value = item[field]
+        # Find field with case-insensitive matching
+        field_lower = field.lower()
+        matched_field = None
+        for key in item.keys():
+            if key.lower() == field_lower:
+                matched_field = key
+                break
+        
+        if not matched_field:
+            return {
+                'passed': False,
+                'detail': f'Field "{field}" not found in item'
+            }
+        
+        item_value = item[matched_field]
         
         if rule_type == 'range':
             if min_val is not None and max_val is not None:
@@ -276,19 +291,31 @@ class RuleConfig:
         
         elif rule_type == 'min':
             if value is not None:
-                passed = item_value >= value
+                # Case-insensitive string comparison for strings
+                if isinstance(item_value, str) or isinstance(value, str):
+                    passed = str(item_value).lower() >= str(value).lower()
+                else:
+                    passed = item_value >= value
                 detail = f'{item_value} {"≥" if passed else "<"} {value}'
                 return {'passed': passed, 'detail': detail}
         
         elif rule_type == 'max':
             if value is not None:
-                passed = item_value <= value
+                # Case-insensitive string comparison for strings
+                if isinstance(item_value, str) or isinstance(value, str):
+                    passed = str(item_value).lower() <= str(value).lower()
+                else:
+                    passed = item_value <= value
                 detail = f'{item_value} {"≤" if passed else ">"} {value}'
                 return {'passed': passed, 'detail': detail}
         
         elif rule_type == 'equals':
             if value is not None:
-                passed = item_value == value
+                # Case-insensitive string comparison
+                if isinstance(item_value, str) or isinstance(value, str):
+                    passed = str(item_value).lower() == str(value).lower()
+                else:
+                    passed = item_value == value
                 detail = f'{item_value} {"==" if passed else "!="} {value}'
                 return {'passed': passed, 'detail': detail}
         
@@ -338,19 +365,60 @@ class RuleConfig:
             
             filter_results = {}
             all_passed = True
+            filters_passed_count = 0
             
             for filter_rule in filter_rules:
                 filter_name = filter_rule.get('name', 'unnamed_filter')
+                field = filter_rule.get('field', '')
+                rule_type = filter_rule.get('rule_type', '')
+                value = filter_rule.get('value')
+                min_val = filter_rule.get('min')
+                max_val = filter_rule.get('max')
+                
                 result = self.apply_filter(item, filter_rule)
+                
+                # Get actual item value for the field
+                field_lower = field.lower()
+                matched_field = None
+                item_value = None
+                for key in item.keys():
+                    if key.lower() == field_lower:
+                        matched_field = key
+                        item_value = item[key]
+                        break
+                
+                # Enhance result with field and value information
+                result['field'] = field
+                result['field_value'] = item_value
+                result['rule_type'] = rule_type
+                if rule_type == 'range':
+                    result['expected'] = f"{field} in [{min_val}-{max_val}]"
+                elif rule_type == 'min':
+                    result['expected'] = f"{field} >= {value}"
+                elif rule_type == 'max':
+                    result['expected'] = f"{field} <= {value}"
+                elif rule_type == 'equals':
+                    result['expected'] = f"{field} == {value}"
+                elif rule_type == 'contains':
+                    result['expected'] = f"{field} contains '{value}'"
+                else:
+                    result['expected'] = f"{field} {rule_type} {value if value is not None else ''}"
+                
+                result['actual'] = f"{field} = {item_value}" if item_value is not None else f"{field} = N/A"
+                
                 filter_results[filter_name] = result
                 
-                if not result['passed']:
+                if result['passed']:
+                    filters_passed_count += 1
+                else:
                     all_passed = False
             
             evaluations.append({
                 'item_id': item_id,
                 'item_name': item_name,
                 'passed': all_passed,
+                'filters_passed_count': filters_passed_count,
+                'total_filters': len(filter_rules),
                 'filter_results': filter_results,
                 'metrics': item
             })
@@ -419,35 +487,206 @@ class RuleConfig:
             
             filter_descriptions.append(filter_desc)
         
-        # Build reasoning
-        reasoning_parts = [
-            f"Applied {len(filter_rules)} filter rule(s) to {total} candidate(s):"
-        ]
+        # Build main reasoning summary at the top
+        reasoning_parts = []
+        
+        # Main summary: Why items were chosen
+        filter_names = [rule.get('name', 'unnamed') for rule in filter_rules]
+        filter_names_str = ", ".join(filter_names)
+        
+        if passed > 0:
+            # Get items that passed all filters
+            all_passed_items = [e for e in evaluations if e.get('passed', False)]
+            if all_passed_items:
+                # Get top item metrics for context
+                top_item = all_passed_items[0]
+                metrics = top_item.get('metrics', {})
+                metric_strs = []
+                for key in ['price', 'rating', 'reviews', 'value', 'score', 'count']:
+                    if key in metrics:
+                        if key == 'price':
+                            metric_strs.append(f"${metrics[key]:.2f}")
+                        elif key == 'rating':
+                            metric_strs.append(f"{metrics[key]}★")
+                        else:
+                            metric_strs.append(f"{metrics[key]}")
+                
+                metrics_summary = f" ({', '.join(metric_strs)})" if metric_strs else ""
+                
+                reasoning_parts.append(
+                    f"Main Reasoning: {passed} candidate(s) passed all {len(filter_rules)} filter(s): {filter_names_str}. "
+                    f"Top candidate: {top_item.get('item_name', 'Unknown')}{metrics_summary}. "
+                    f"All items will be ranked by number of filters passed, then by ranking criteria."
+                )
+            else:
+                reasoning_parts.append(
+                    f"Main Reasoning: {passed} candidate(s) passed all {len(filter_rules)} filter(s): {filter_names_str}. "
+                    f"Items ranked by number of filters passed ({len(filter_rules)} total), then by ranking criteria."
+                )
+        else:
+            # Find items with highest filter count
+            max_filters_passed = max((e.get('filters_passed_count', 0) for e in evaluations), default=0)
+            if max_filters_passed > 0:
+                top_items = [e for e in evaluations if e.get('filters_passed_count', 0) == max_filters_passed]
+                top_item = top_items[0] if top_items else None
+                
+                if top_item:
+                    metrics = top_item.get('metrics', {})
+                    metric_strs = []
+                    for key in ['price', 'rating', 'reviews', 'value', 'score', 'count']:
+                        if key in metrics:
+                            if key == 'price':
+                                metric_strs.append(f"${metrics[key]:.2f}")
+                            elif key == 'rating':
+                                metric_strs.append(f"{metrics[key]}★")
+                            else:
+                                metric_strs.append(f"{metrics[key]}")
+                    
+                    metrics_summary = f" ({', '.join(metric_strs)})" if metric_strs else ""
+                    
+                    reasoning_parts.append(
+                        f"Main Reasoning: No candidates passed all {len(filter_rules)} filter(s): {filter_names_str}. "
+                        f"Top candidate passed {max_filters_passed}/{len(filter_rules)} filters: {top_item.get('item_name', 'Unknown')}{metrics_summary}. "
+                        f"Items ranked by number of filters passed ({max_filters_passed} max), then by ranking criteria."
+                    )
+                else:
+                    reasoning_parts.append(
+                        f"Main Reasoning: No candidates passed all {len(filter_rules)} filter(s): {filter_names_str}. "
+                        f"Items ranked by number of filters passed, then by ranking criteria."
+                    )
+            else:
+                reasoning_parts.append(
+                    f"Main Reasoning: No candidates passed any of the {len(filter_rules)} filter(s): {filter_names_str}. "
+                    f"Items ranked by number of filters passed (0 max), then by ranking criteria."
+                )
+        
+        reasoning_parts.append("")
+        reasoning_parts.append(f"Filters Applied ({len(filter_rules)} total):")
         
         for desc in filter_descriptions:
             reasoning_parts.append(f"  • {desc}")
         
-        reasoning_parts.append(f"\nResult: {passed} passed, {failed} failed")
+        reasoning_parts.append(f"\nSummary: {passed} out of {total} candidates passed all {len(filter_rules)} filter(s), {failed} failed")
         
-        # Add details about failures if any
-        if failed > 0:
-            failed_items = [e for e in evaluations if not e.get('passed', False)]
-            failed_reasons = []
+        # Show detailed evaluation for each candidate (similar to user's example)
+        reasoning_parts.append("\nCandidates Evaluated:")
+        
+        # Sort by filters_passed_count (desc) to show best matches first
+        sorted_evaluations = sorted(
+            evaluations, 
+            key=lambda e: (e.get('filters_passed_count', 0), e.get('item_name', '')),
+            reverse=True
+        )
+        
+        for item in sorted_evaluations[:10]:  # Show top 10
+            item_name = item.get('item_name', 'Unknown')
+            filters_passed = item.get('filters_passed_count', 0)
+            total_filters = item.get('total_filters', 0)
             
-            for item in failed_items[:5]:  # Show first 5 failures
-                item_name = item.get('item_name', 'Unknown')
-                failed_filters = [
-                    name for name, result in item.get('filter_results', {}).items()
-                    if not result.get('passed', True)
-                ]
-                if failed_filters:
-                    failed_reasons.append(f"  • {item_name}: failed {', '.join(failed_filters)}")
+            # Build filter status string
+            filter_statuses = []
+            for filter_name, result in item.get('filter_results', {}).items():
+                status = "✓" if result.get('passed', False) else "✗"
+                filter_statuses.append(f"{status} {filter_name}")
             
-            if failed_reasons:
-                reasoning_parts.append("\nFailed items:")
-                reasoning_parts.extend(failed_reasons)
-                if failed > 5:
-                    reasoning_parts.append(f"  ... and {failed - 5} more")
+            filter_status_str = ", ".join(filter_statuses) if filter_statuses else "no filters"
+            
+            # Get key metrics for display
+            metrics = item.get('metrics', {})
+            metric_strs = []
+            for key in ['price', 'rating', 'reviews', 'value', 'score', 'count']:
+                if key in metrics:
+                    if key == 'price':
+                        metric_strs.append(f"${metrics[key]:.2f}")
+                    elif key == 'rating':
+                        metric_strs.append(f"{metrics[key]}★")
+                    else:
+                        metric_strs.append(f"{metrics[key]}")
+            
+            metrics_str = f" ({', '.join(metric_strs)})" if metric_strs else ""
+            
+            # Build detailed failure reasons with actual field values
+            failed_details = []
+            passed_details = []
+            
+            for filter_name, result in item.get('filter_results', {}).items():
+                detail = result.get('detail', '')
+                passed = result.get('passed', False)
+                
+                # Extract field name and value from filter rule
+                filter_rule = next((r for r in filter_rules if r.get('name') == filter_name), None)
+                if filter_rule:
+                    field = filter_rule.get('field', '')
+                    rule_type = filter_rule.get('rule_type', '')
+                    value = filter_rule.get('value')
+                    min_val = filter_rule.get('min')
+                    max_val = filter_rule.get('max')
+                    
+                    # Get actual item value from metrics
+                    item_value = metrics.get(field, 'N/A')
+                    
+                    # Try to extract from detail if available
+                    if item_value == 'N/A' and detail:
+                        # Try to parse value from detail string (e.g., "$34.99 is within range...")
+                        import re
+                        # Look for common patterns in detail
+                        if field in detail.lower():
+                            # Try to extract the value mentioned in detail
+                            value_match = re.search(r'(\$?[\d.]+|[\w]+)', detail)
+                            if value_match:
+                                item_value = value_match.group(1)
+                    
+                    # Build comparison string
+                    if rule_type == 'equals':
+                        comp_str = f"{field} == {value}"
+                    elif rule_type == 'min':
+                        comp_str = f"{field} >= {value}"
+                    elif rule_type == 'max':
+                        comp_str = f"{field} <= {value}"
+                    elif rule_type == 'range':
+                        comp_str = f"{field} in [{min_val}-{max_val}]"
+                    elif rule_type == 'contains':
+                        comp_str = f"{field} contains '{value}'"
+                    else:
+                        comp_str = f"{filter_name}"
+                    
+                    if passed:
+                        passed_details.append(f"{comp_str} (actual: {item_value})")
+                    else:
+                        failed_details.append(f"{comp_str} (actual: {item_value})")
+            
+            if filters_passed == total_filters:
+                status_marker = "✓"
+                status_text = f"PASSED all {total_filters} filters"
+                if passed_details:
+                    status_text += f" - {', '.join(passed_details[:3])}"  # Show first 3 passed
+                    if len(passed_details) > 3:
+                        status_text += f" and {len(passed_details) - 3} more"
+            else:
+                status_marker = "✗"
+                if failed_details:
+                    status_text = f"FAILED: {', '.join(failed_details[:3])}"  # Show first 3 failed
+                    if len(failed_details) > 3:
+                        status_text += f" and {len(failed_details) - 3} more"
+                else:
+                    status_text = f"Passed {filters_passed}/{total_filters} filters"
+            
+            # Use tree structure format - determine if this is the last item to show
+            is_last_in_display = (item == sorted_evaluations[min(9, len(sorted_evaluations)-1)]) or (len(sorted_evaluations) <= 10 and item == sorted_evaluations[-1])
+            
+            if is_last_in_display:
+                # Last item in the displayed list
+                reasoning_parts.append(
+                    f"  └── {status_marker} {item_name}{metrics_str} - {status_text}")
+            else:
+                reasoning_parts.append(
+                    f"  ├── {status_marker} {item_name}{metrics_str} - {status_text}")
+        
+        if len(evaluations) > 10:
+            remaining = len(evaluations) - 10
+            passed_remaining = sum(1 for e in sorted_evaluations[10:] if e.get('passed', False))
+            failed_remaining = remaining - passed_remaining
+            reasoning_parts.append(f"  └── ... ({remaining} more: {passed_remaining} passed, {failed_remaining} failed)")
         
         return "\n".join(reasoning_parts)
     
@@ -490,41 +729,132 @@ class RuleConfig:
         
         criteria_desc = ", ".join(criteria_parts)
         
-        # Build reasoning
-        reasoning_parts = [
-            f"Ranked {len(ranked_candidates)} candidate(s) using criteria: {criteria_desc}"
-        ]
-        
-        # Show top 3 ranked items
-        top_items = ranked_candidates[:3]
-        for i, item in enumerate(top_items, 1):
-            item_name = item.get('item_name', 'Unknown')
-            total_score = item.get('total_score', 0)
-            score_breakdown = item.get('score_breakdown', {})
-            
-            breakdown_str = ", ".join([
-                f"{k}={v}" for k, v in score_breakdown.items()
-            ])
-            
-            reasoning_parts.append(
-                f"  {i}. {item_name} (score: {total_score:.2f}, breakdown: {breakdown_str})"
-            )
+        # Build main reasoning summary at the top
+        reasoning_parts = []
         
         if selected_item:
-            selected_name = selected_item.get('name') or selected_item.get('id', 'Unknown')
-            reasoning_parts.append(f"\nSelected: {selected_name}")
-            
-            # Find selected item in ranked list
-            selected_rank = next(
-                (i + 1 for i, item in enumerate(ranked_candidates) 
+            selected_rank_item = next(
+                (item for item in ranked_candidates 
                  if item.get('item_id') == selected_item.get('id')),
                 None
             )
             
-            if selected_rank:
+            if selected_rank_item:
+                selected_name = selected_item.get('name') or selected_item.get('id', 'Unknown')
+                filters_passed = selected_rank_item.get('filters_passed_count', 0)
+                total_filters = selected_rank_item.get('total_filters', 0)
+                criteria_score = selected_rank_item.get('criteria_score', 0)
+                rank = selected_rank_item.get('rank', 1)
+                
+                # Get filter names that were passed
+                filter_results = selected_rank_item.get('filter_results', {})
+                passed_filter_names = [name for name, r in filter_results.items() if r.get('passed', False)]
+                
+                if filters_passed == total_filters and total_filters > 0:
+                    main_reason = (
+                        f"Main Reasoning: Selected '{selected_name}' (Rank #{rank}) because it passed all {total_filters} filters: "
+                        f"{', '.join(passed_filter_names)}. "
+                        f"Ranking score: {criteria_score:.2f} based on {criteria_desc}."
+                    )
+                elif total_filters > 0:
+                    main_reason = (
+                        f"Main Reasoning: Selected '{selected_name}' (Rank #{rank}) because it passed {filters_passed}/{total_filters} filters "
+                        f"({', '.join(passed_filter_names) if passed_filter_names else 'none'}), "
+                        f"which is the highest among items with {filters_passed} filters passed. "
+                        f"Ranking score: {criteria_score:.2f} based on {criteria_desc}."
+                    )
+                else:
+                    main_reason = (
+                        f"Main Reasoning: Selected '{selected_name}' (Rank #{rank}) with ranking score: {criteria_score:.2f} "
+                        f"based on {criteria_desc}."
+                    )
+                
+                reasoning_parts.append(main_reason)
+            else:
                 reasoning_parts.append(
-                    f"Reason: Ranked #{selected_rank} with highest overall score based on {criteria_desc}"
+                    f"Main Reasoning: Ranked {len(ranked_candidates)} candidate(s) by: (1) filters passed, (2) then by criteria: {criteria_desc}"
                 )
+        else:
+            reasoning_parts.append(
+                f"Main Reasoning: Ranked {len(ranked_candidates)} candidate(s) by: (1) filters passed, (2) then by criteria: {criteria_desc}"
+            )
+        
+        reasoning_parts.append("")
+        reasoning_parts.append(f"Ranking Details:")
+        
+        # Show top 5 ranked items with filter information
+        top_items = ranked_candidates[:5]
+        for i, item in enumerate(top_items, 1):
+            item_name = item.get('item_name', 'Unknown')
+            filters_passed = item.get('filters_passed_count', 0)
+            total_filters = item.get('total_filters', 0)
+            criteria_score = item.get('criteria_score', item.get('total_score', 0))
+            
+            # Get key metrics for display
+            metrics = item.get('metrics', {})
+            metric_strs = []
+            for key in ['price', 'rating', 'reviews', 'value', 'score', 'count']:
+                if key in metrics:
+                    if key == 'price':
+                        metric_strs.append(f"${metrics[key]:.2f}")
+                    elif key == 'rating':
+                        metric_strs.append(f"{metrics[key]}★")
+                    else:
+                        metric_strs.append(f"{metrics[key]}")
+            
+            metrics_str = f" ({', '.join(metric_strs)})" if metric_strs else ""
+            
+            reasoning_parts.append(
+                f"  {i}. {item_name}{metrics_str} - {filters_passed}/{total_filters} filters passed, criteria score: {criteria_score:.2f}"
+            )
+        
+        if selected_item:
+            selected_name = selected_item.get('name') or selected_item.get('id', 'Unknown')
+            reasoning_parts.append(f"\nFinal Recommendation:")
+            reasoning_parts.append(f"Selected: {selected_name}")
+            
+            # Find selected item in ranked list
+            selected_rank_item = next(
+                (item for item in ranked_candidates 
+                 if item.get('item_id') == selected_item.get('id')),
+                None
+            )
+            
+            if selected_rank_item:
+                filters_passed = selected_rank_item.get('filters_passed_count', 0)
+                total_filters = selected_rank_item.get('total_filters', 0)
+                rank = selected_rank_item.get('rank', 'N/A')
+                criteria_score = selected_rank_item.get('criteria_score', 0)
+                
+                # Get key metrics for display
+                metrics = selected_rank_item.get('metrics', {})
+                metric_strs = []
+                for key in ['price', 'rating', 'reviews', 'value', 'score', 'count']:
+                    if key in metrics:
+                        if key == 'price':
+                            metric_strs.append(f"${metrics[key]:.2f}")
+                        elif key == 'rating':
+                            metric_strs.append(f"{metrics[key]}★")
+                        else:
+                            metric_strs.append(f"{metrics[key]}")
+                
+                metrics_str = f" ({', '.join(metric_strs)})" if metric_strs else ""
+                
+                if filters_passed == total_filters:
+                    reason = f"Ranked #{rank} - PASSED ALL {total_filters} FILTERS{metrics_str}"
+                    if criteria_desc:
+                        primary_field = criteria_desc.split(',')[0].split(':')[1].strip() if ':' in criteria_desc else 'score'
+                        primary_value = metrics.get(primary_field, 'N/A')
+                        reason += f", highest {primary_field} ({primary_value})"
+                else:
+                    reason = f"Ranked #{rank} - passed {filters_passed}/{total_filters} filters (highest among items with {filters_passed} filters passed){metrics_str}"
+                    if criteria_desc:
+                        primary_field = criteria_desc.split(',')[0].split(':')[1].strip() if ':' in criteria_desc else 'score'
+                        primary_value = metrics.get(primary_field, 'N/A')
+                        reason += f", best {primary_field} ({primary_value})"
+                
+                reasoning_parts.append(f"Reasoning: {reason}")
+                reasoning_parts.append(f"Ranking Score: {criteria_score:.2f}")
         
         return "\n".join(reasoning_parts)
     

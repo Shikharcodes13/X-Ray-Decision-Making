@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { XRayAPI } from '../api'
 import './DataUpload.css'
@@ -9,25 +9,6 @@ function DataUpload() {
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState(null)
   const [uploadedDataset, setUploadedDataset] = useState(null)
-  const [datasets, setDatasets] = useState([])
-  const [loading, setLoading] = useState(true)
-
-  // Load existing datasets
-  useEffect(() => {
-    loadDatasets()
-  }, [])
-
-  const loadDatasets = async () => {
-    try {
-      setLoading(true)
-      const data = await XRayAPI.listDatasets()
-      setDatasets(data)
-    } catch (err) {
-      console.error('Failed to load datasets:', err)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleFileSelect = async (event) => {
     const file = event.target.files[0]
@@ -54,9 +35,6 @@ function DataUpload() {
       
       const result = await XRayAPI.uploadDataset(file)
       setUploadedDataset(result)
-      
-      // Reload datasets list
-      await loadDatasets()
       
       // Clear file input
       if (fileInputRef.current) {
@@ -198,52 +176,6 @@ function DataUpload() {
         )}
       </div>
 
-      {/* Existing Datasets */}
-      <div className="datasets-section">
-        <h2>Your Datasets</h2>
-        {loading ? (
-          <div className="loading">Loading datasets...</div>
-        ) : datasets.length === 0 ? (
-          <div className="empty-state">
-            <p>No datasets uploaded yet. Upload a file to get started!</p>
-          </div>
-        ) : (
-          <div className="datasets-grid">
-            {datasets.map((dataset) => (
-              <div key={dataset.dataset_id} className="dataset-card">
-                <div className="dataset-header">
-                  <h3>{dataset.filename}</h3>
-                  <span className="dataset-id">ID: {dataset.dataset_id}</span>
-                </div>
-                <div className="dataset-stats">
-                  <div className="stat">
-                    <span className="stat-label">Rows</span>
-                    <span className="stat-value">{dataset.row_count.toLocaleString()}</span>
-                  </div>
-                  <div className="stat">
-                    <span className="stat-label">Fields</span>
-                    <span className="stat-value">{dataset.fields.length}</span>
-                  </div>
-                </div>
-                <div className="dataset-fields">
-                  {dataset.fields.slice(0, 5).map((field) => (
-                    <span key={field} className="field-tag">{field}</span>
-                  ))}
-                  {dataset.fields.length > 5 && (
-                    <span className="field-tag">+{dataset.fields.length - 5} more</span>
-                  )}
-                </div>
-                <button
-                  className="btn-secondary"
-                  onClick={() => handleCreateWorkflow(dataset)}
-                >
-                  Use in Workflow →
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
     </div>
   )
 }

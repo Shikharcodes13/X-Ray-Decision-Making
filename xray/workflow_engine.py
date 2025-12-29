@@ -182,7 +182,15 @@ class GenericWorkflowEngine:
             checks = []
             
             for field in input_fields:
-                if field not in row:
+                # Case-insensitive field matching
+                field_lower = field.lower()
+                matched_field = None
+                for key in row.keys():
+                    if key.lower() == field_lower:
+                        matched_field = key
+                        break
+                
+                if not matched_field:
                     all_passed = False
                     checks.append({
                         "rule": f"{field} {operator} {value}",
@@ -193,7 +201,7 @@ class GenericWorkflowEngine:
                     })
                     continue
                 
-                field_value = row[field]
+                field_value = row[matched_field]
                 field_values[field] = field_value
                 
                 # Evaluate condition
@@ -262,7 +270,15 @@ class GenericWorkflowEngine:
         def sort_key(row):
             values = []
             for field in input_fields:
-                val = row.get(field)
+                # Case-insensitive field matching
+                field_lower = field.lower()
+                matched_field = None
+                for key in row.keys():
+                    if key.lower() == field_lower:
+                        matched_field = key
+                        break
+                
+                val = row.get(matched_field) if matched_field else None
                 if val is None:
                     val = float('-inf') if order == "desc" else float('inf')
                 values.append(val)
@@ -278,8 +294,17 @@ class GenericWorkflowEngine:
         for rank, row in enumerate(sorted_data, 1):
             entity_id = row.get("id") or row.get("_id") or str(hash(str(row)))
             
-            # Calculate score based on ranking fields
-            score = sum(row.get(field, 0) for field in input_fields if isinstance(row.get(field), (int, float)))
+            # Calculate score based on ranking fields (case-insensitive)
+            score = 0
+            for field in input_fields:
+                field_lower = field.lower()
+                matched_field = None
+                for key in row.keys():
+                    if key.lower() == field_lower:
+                        matched_field = key
+                        break
+                if matched_field and isinstance(row.get(matched_field), (int, float)):
+                    score += row.get(matched_field, 0)
             
             evaluations.append({
                 "entity_id": entity_id,
@@ -325,26 +350,72 @@ class GenericWorkflowEngine:
         }
     
     def _evaluate_condition(self, value: Any, operator: str, expected: Any) -> bool:
-        """Evaluate a condition."""
+        """Evaluate a condition with proper type handling."""
         try:
+            # Convert both to strings for comparison if either is a string
+            value_str = str(value).strip() if isinstance(value, str) else value
+            expected_str = str(expected).strip() if isinstance(expected, str) else expected
+            
+            # Determine if we're comparing strings
+            is_string_comparison = isinstance(value, str) or isinstance(expected, str)
+            
             if operator == "==":
+                if is_string_comparison:
+                    # Case-insensitive string equality
+                    return str(value_str).lower() == str(expected_str).lower()
                 return value == expected
             elif operator == "!=":
+                if is_string_comparison:
+                    return str(value_str).lower() != str(expected_str).lower()
                 return value != expected
+            elif operator == "contains":
+                # String contains (case-insensitive)
+                return str(expected_str).lower() in str(value_str).lower()
+            elif operator == "not_contains":
+                # String does not contain (case-insensitive)
+                return str(expected_str).lower() not in str(value_str).lower()
+            elif operator == "starts_with":
+                # String starts with (case-insensitive)
+                return str(value_str).lower().startswith(str(expected_str).lower())
+            elif operator == "ends_with":
+                # String ends with (case-insensitive)
+                return str(value_str).lower().endswith(str(expected_str).lower())
+            elif operator == "in":
+                # Value in list
+                if isinstance(expected, (list, tuple)):
+                    if is_string_comparison:
+                        return str(value_str).lower() in [str(e).lower() for e in expected]
+                    return value in expected
+                return False
+            elif operator == "not_in":
+                # Value not in list
+                if isinstance(expected, (list, tuple)):
+                    if is_string_comparison:
+                        return str(value_str).lower() not in [str(e).lower() for e in expected]
+                    return value not in expected
+                return True
             elif operator == ">":
+                # Numeric comparison only
+                if is_string_comparison:
+                    # For strings, use case-insensitive lexicographic comparison
+                    return str(value_str).lower() > str(expected_str).lower()
                 return value > expected
             elif operator == ">=":
+                # Numeric comparison only
+                if is_string_comparison:
+                    # For strings, use case-insensitive lexicographic comparison
+                    return str(value_str).lower() >= str(expected_str).lower()
                 return value >= expected
             elif operator == "<":
+                if is_string_comparison:
+                    # For strings, use case-insensitive lexicographic comparison
+                    return str(value_str).lower() < str(expected_str).lower()
                 return value < expected
             elif operator == "<=":
+                if is_string_comparison:
+                    # For strings, use case-insensitive lexicographic comparison
+                    return str(value_str).lower() <= str(expected_str).lower()
                 return value <= expected
-            elif operator == "contains":
-                return str(expected).lower() in str(value).lower()
-            elif operator == "in":
-                return value in expected if isinstance(expected, (list, tuple)) else False
-            elif operator == "not_in":
-                return value not in expected if isinstance(expected, (list, tuple)) else True
             else:
                 return False
         except (TypeError, ValueError):

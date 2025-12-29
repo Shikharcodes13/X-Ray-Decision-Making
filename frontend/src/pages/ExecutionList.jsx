@@ -45,21 +45,38 @@ function ExecutionList() {
     )
   }
 
-  if (executions.length === 0) {
-    return (
-      <div className="execution-list">
-        <div className="empty-state">
-          <h2>No executions yet</h2>
-          <p>Run a demo application or use the Run Workflow page to see X-Ray data here</p>
-        </div>
-      </div>
-    )
-  }
-
   return (
     <div className="execution-list">
-      <div className="executions-container">
-        {executions.map((exec, idx) => {
+      {/* Landing Page Hero Section */}
+      <div className="landing-hero">
+        <h1 className="hero-title">🔍 X-Ray Decision Engine</h1>
+        <p className="hero-subtitle">Track and understand the reasoning behind every decision in your workflows</p>
+        
+        <div className="action-cards">
+          <div className="action-card" onClick={() => navigate('/workflow-builder')}>
+            <div className="action-icon">⚙️</div>
+            <h3>Build Workflow</h3>
+            <p>Create custom workflows with filters and ranking rules</p>
+          </div>
+          <div className="action-card" onClick={() => navigate('/data-upload')}>
+            <div className="action-icon">📊</div>
+            <h3>Upload Data</h3>
+            <p>Upload CSV or JSON data for processing</p>
+          </div>
+        </div>
+      </div>
+
+      {/* Executions Section */}
+      {executions.length === 0 ? (
+        <div className="empty-state">
+          <h2>No executions yet</h2>
+          <p>Create and run a workflow to see execution history and reasoning here</p>
+        </div>
+      ) : (
+        <div className="executions-section">
+          <h2 className="section-title">Recent Executions</h2>
+          <div className="executions-container">
+            {executions.map((exec, idx) => {
           // Support both canonical and legacy formats
           const execId = exec.id || exec.execution_id
           const execName = exec.name || exec.metadata?.workflow || exec.metadata?.name || 'Unnamed Execution'
@@ -92,7 +109,9 @@ function ExecutionList() {
             </div>
           )
         })}
-      </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

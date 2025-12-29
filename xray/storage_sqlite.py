@@ -182,8 +182,12 @@ class SQLiteStorage(StorageBackend):
             steps = [json.loads(row[0]) for row in cursor.fetchall()]
             
             # Build canonical format
-            # Extract name from metadata if available
-            name = metadata.get("name") or metadata.get("workflow") or "unnamed_execution"
+            # Extract name from metadata if available (check multiple possible keys)
+            name = (metadata.get("name") or 
+                   metadata.get("execution_name") or 
+                   metadata.get("workflow") or 
+                   metadata.get("workflow_name") or 
+                   "unnamed_execution")
             
             # Extract timestamps
             started_at = metadata.get("started_at") or created_at
@@ -263,7 +267,11 @@ class SQLiteStorage(StorageBackend):
                 metadata = json.loads(metadata_json)
                 
                 # Build canonical format summary
-                name = metadata.get("name") or metadata.get("workflow") or "unnamed_execution"
+                name = (metadata.get("name") or 
+                       metadata.get("execution_name") or 
+                       metadata.get("workflow") or 
+                       metadata.get("workflow_name") or 
+                       "unnamed_execution")
                 started_at = metadata.get("started_at") or created_at
                 ended_at = metadata.get("ended_at") or metadata.get("completed_at")
                 
